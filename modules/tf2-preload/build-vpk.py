@@ -6,9 +6,10 @@ Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk>
   like casual-pre-loader's `get_from_custom_dir`.
 * Adds a VMT for every weapon/pattern VTF that has none, copied from the game's
   own VMT when there is one, like `generate_missing_vmt_files`.
-* Writes a single-file V1 VPK, so split `_dir`/`_000` VPKs become one file.
+* Writes a single-file V2 VPK, so split `_dir`/`_000` VPKs become one file.
 """
 
+import hashlib
 import re
 import struct
 import sys
@@ -29,10 +30,11 @@ def generic_vmt(texture: str) -> bytes:
 
 
 def write_vpk(out: str, files: dict[str, bytes]) -> None:
-    """Write a single-file V1 VPK with the data after the directory tree.
+    """Write a single-file V2 VPK, with the data after the directory tree.
 
     srctools keeps a single-file VPK's data inside the tree as preload data,
-    which is capped at 64 KiB per file, so it can't write larger files.
+    which is capped at 64 KiB per file, so it can't write larger files. V1 has
+    no data section after the tree (TF2 reads the wrong bytes), so this is V2.
     """
     # ext -> dir -> name -> data. Valve uses " " for an empty dir or extension.
     tree: dict[str, dict[str, dict[str, bytes]]] = {}
@@ -57,10 +59,16 @@ def write_vpk(out: str, files: dict[str, bytes]) -> None:
         entries += b"\0"
     entries += b"\0"
 
+    # signature, version, tree size, data size, archive MD5 size (no archives),
+    # other MD5 size (the three MD5s below), signature size (unsigned)
+    body = struct.pack("<7I", 0x55AA1234, 2, len(entries), len(blobs), 0, 48, 0) + entries + blobs
+    # MD5s of the tree, of the empty archive MD5 section, and of everything before this one
+    md5s = hashlib.md5(entries).digest() + hashlib.md5(b"").digest()
+    md5s += hashlib.md5(body + md5s).digest()
+
     with open(out, "wb") as f:
-        f.write(struct.pack("<III", 0x55AA1234, 1, len(entries)))
-        f.write(entries)
-        f.write(blobs)
+        f.write(body)
+        f.write(md5s)
 
 
 def main(src: str, vanilla_dir: str, out: str) -> None:
