@@ -10,7 +10,9 @@ Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk>
 """
 
 import re
+import struct
 import sys
+import zlib
 from pathlib import Path, PurePosixPath
 
 from srctools.vpk import VPK
@@ -24,6 +26,41 @@ VMT_DIRS = ("materials/models/weapons/", "materials/patterns/")
 
 def generic_vmt(texture: str) -> bytes:
     return f'"LightmappedGeneric"\n{{\n\t"$basetexture" "{texture}"\n}}\n'.encode()
+
+
+def write_vpk(out: str, files: dict[str, bytes]) -> None:
+    """Write a single-file V1 VPK with the data after the directory tree.
+
+    srctools keeps a single-file VPK's data inside the tree as preload data,
+    which is capped at 64 KiB per file, so it can't write larger files.
+    """
+    # ext -> dir -> name -> data. Valve uses " " for an empty dir or extension.
+    tree: dict[str, dict[str, dict[str, bytes]]] = {}
+    for path, data in files.items():
+        p = PurePosixPath(path.lower())
+        ext = p.suffix[1:] or " "
+        folder = p.parent.as_posix()
+        tree.setdefault(ext, {}).setdefault(" " if folder == "." else folder, {})[p.stem] = data
+
+    entries = bytearray()
+    blobs = bytearray()
+    for ext, folders in sorted(tree.items()):
+        entries += ext.encode() + b"\0"
+        for folder, names in sorted(folders.items()):
+            entries += folder.encode() + b"\0"
+            for name, data in sorted(names.items()):
+                entries += name.encode() + b"\0"
+                # crc, preload bytes, archive (0x7fff = this file), offset, length, terminator
+                entries += struct.pack("<IHHIIH", zlib.crc32(data), 0, 0x7FFF, len(blobs), len(data), 0xFFFF)
+                blobs += data
+            entries += b"\0"
+        entries += b"\0"
+    entries += b"\0"
+
+    with open(out, "wb") as f:
+        f.write(struct.pack("<III", 0x55AA1234, 1, len(entries)))
+        f.write(entries)
+        f.write(blobs)
 
 
 def main(src: str, vanilla_dir: str, out: str) -> None:
@@ -62,10 +99,7 @@ def main(src: str, vanilla_dir: str, out: str) -> None:
             files[vmt] = generic_vmt(p.with_suffix("").as_posix()[len("materials/"):])
             print(f"{vmt}: not in the game, wrote a generic VMT")
 
-    vpk = VPK(out, mode="w")
-    for path, data in sorted(files.items()):
-        vpk.add_file(path, data, arch_index=None)
-    vpk.write_dirfile()
+    write_vpk(out, files)
 
     print(f"{len(files)} files, {blanked} $ignorez blanked")
 
