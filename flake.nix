@@ -1,8 +1,9 @@
 {
-  description = "Home Manager modules to declaratively manage TF2 mods (budhud, mastercomfig)";
+  description = "Home Manager modules to declaratively manage TF2 mods (budhud, mastercomfig, tf2-preload)";
 
-  # Only used for budhud's image converter Python (Pillow + srctools), so a
-  # nixpkgs update can't silently change how menu backgrounds are converted.
+  # Only used for the Python (Pillow + srctools) behind budhud's image converter
+  # and tf2-preload's VPK repacker, so a nixpkgs update can't silently change
+  # their output.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs }: {
@@ -14,8 +15,18 @@
             (p: [ p.pillow p.srctools ]));
       };
       mastercomfig = ./modules/mastercomfig;
+      tf2-preload = { lib, pkgs, ... }: {
+        imports = [ ./modules/tf2-preload ];
+        programs.tf2-preload.python = lib.mkDefault
+          (nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.python3.withPackages
+            (p: [ p.srctools ]));
+      };
       default = {
-        imports = [ self.homeManagerModules.budhud self.homeManagerModules.mastercomfig ];
+        imports = [
+          self.homeManagerModules.budhud
+          self.homeManagerModules.mastercomfig
+          self.homeManagerModules.tf2-preload
+        ];
       };
     };
   };
