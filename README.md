@@ -6,7 +6,7 @@ Home-manager modules to declaratively manage Team Fortress 2 mods:
 | --- | --- | --- |
 | `programs.budhud` | [budhud](https://github.com/rbjaxter/budhud) | [docs/budhud.md](docs/budhud.md) |
 | `programs.mastercomfig` | [mastercomfig](https://github.com/mastercomfig/mastercomfig) | [docs/mastercomfig.md](docs/mastercomfig.md) |
-| `programs.tf2-preload` | Custom VPKs (reskins), preloaded like [casual-pre-loader](https://github.com/cueki/casual-pre-loader) | [docs/tf2-preload.md](docs/tf2-preload.md) |
+| `programs.tf2-preload` | Custom VPKs (reskins) and particle mods, preloaded like [casual-pre-loader](https://github.com/cueki/casual-pre-loader) | [docs/tf2-preload.md](docs/tf2-preload.md) |
 
 # Usage
 
@@ -29,8 +29,8 @@ and you're ready to configure. `default` imports every module; nothing is instal
 `tf2-nix.homeManagerModules.mastercomfig` or `tf2-nix.homeManagerModules.tf2-preload` (which also needs
 mastercomfig).
 
-The flake pins its own nixpkgs, which is only used for the Python (Pillow and srctools) that converts
-budhud's [`menuBackground`](docs/budhud.md#menu-background) images and repacks tf2-preload's VPKs. Don't set `inputs.nixpkgs.follows` on it
+The flake pins its own nixpkgs, which is only used for the Python (Pillow, srctools and valve_parsers) that converts
+budhud's [`menuBackground`](docs/budhud.md#menu-background) images and builds tf2-preload's VPKs and particles. Don't set `inputs.nixpkgs.follows` on it
 unless you want that to follow your nixpkgs instead.
 
 You can also use it without the flake: add the input with `flake = false;` and import
