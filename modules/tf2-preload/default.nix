@@ -158,9 +158,10 @@ in
         }
       '';
       description = ''
-        Particle mod VPKs, for `particles`. Their particle systems are split up by
-        the vanilla particle file they replace, like casual-pre-loader's particle
-        import. Each needs either `source`, or `url` and `hash`.
+        Particle mods, for `particles`, as VPKs or unpacked folders (`source` only).
+        Their particle systems are split up by the vanilla particle file they
+        replace, like casual-pre-loader's particle import. Each needs either
+        `source`, or `url` and `hash`.
       '';
     };
 

@@ -29,8 +29,8 @@ Get a download's `hash` with `nix store prefetch-file <url>`. For a mod that com
 with `fetchzip` and point `source` at the VPK inside:
 `source = "${pkgs.fetchzip { url = "..."; hash = "..."; stripRoot = false; }}/shovel.vpk";`.
 If the URL doesn't end in `.zip`, add `extension = "zip";`. For a RAR, use `extension = "rar";` and
-`nativeBuildInputs = [ pkgs.unar ];`; unar unpacks into a folder named after the download, usually
-`download/`.
+`nativeBuildInputs = [ pkgs.unar ];`; if the RAR has several files at its top level, unar unpacks them
+into a folder named after the download, usually `download/`.
 
 ## Particles
 
@@ -70,7 +70,7 @@ All options live under `programs.tf2-preload`.
 | `vpks` | attrs of submodules | `{ }` | VPKs installed as `custom/<name>.vpk`. Each needs `source`, or `url` and `hash`. |
 | `autoexec` | bool | `true` | Run the preload from mastercomfig's autoexec. Set to `false` to run `exec tf2-preload` yourself, e.g. as the launch option `+exec tf2-preload`. |
 | `map` | string | `"itemtest"` | Offline map loaded to cache the assets. |
-| `particleMods` | attrs of submodules | `{ }` | Particle mod VPKs, for `particles`. Each needs `source`, or `url` and `hash`. |
+| `particleMods` | attrs of submodules | `{ }` | Particle mods, for `particles`. Each needs `source` (a VPK or an unpacked mod folder), or `url` and `hash` of a VPK. |
 | `particles` | attrs of strings | `{ }` | Vanilla particle files or groups to replace, each mapped to a `particleMods` name. See [Particles](#particles). |
 | `casualPreLoader` | path | casual-pre-loader, pinned | casual-pre-loader's source, whose particle code, particle map and vanilla particle files build and restore `particles`. It has to match the installed game. |
 | `python` | package | Python with srctools and valve_parsers | Python used to build the VPKs and particles. The flake's module sets this from its pinned nixpkgs. |

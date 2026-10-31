@@ -2,7 +2,7 @@
 
 Usage: build-particles.py <casual-pre-loader source> <config.json> <out dir>
 
-config.json: { "mods": { <name>: <vpk> }, "selections": { <particle or group>: <name> } }
+config.json: { "mods": { <name>: <vpk or folder> }, "selections": { <particle or group>: <name> } }
 A selection key is a vanilla particle file without `.pcf` (e.g. "explosion")
 or one of casual-pre-loader's groups (e.g. "explosions").
 
@@ -30,6 +30,7 @@ import shutil
 import sys
 import tempfile
 import types
+from collections.abc import Iterator
 from pathlib import Path
 
 from srctools.vpk import VPK
@@ -62,6 +63,50 @@ def use_casual_pre_loader(src: Path, work: Path) -> types.SimpleNamespace:
     return config
 
 
+def read_mod(source: Path) -> Iterator[tuple[str, bytes]]:
+    """The files of a VPK or an unpacked mod folder, as (path, contents)."""
+    if source.is_dir():
+        for path in source.rglob("*"):
+            if path.is_file():
+                yield path.relative_to(source).as_posix(), path.read_bytes()
+    else:
+        for info in VPK(source):
+            yield info.filename, info.read()
+
+
+def copy_textures_without_vmt(config: types.SimpleNamespace, selections: dict[str, str]) -> None:
+    """Keep textures that a mod replaces behind one of the game's own VMTs.
+
+    apply_particle_selections only finds textures through the mod's VMTs, so it
+    drops a VTF that has none. Only exact matches for a material the selected
+    particles use are kept, so unselected effects stay vanilla.
+    """
+    from valve_parsers import PCFFile
+
+    for particle, mod in selections.items():
+        materials = config.particles_dir / mod / "materials"
+        pcf_file = config.particles_dir / mod / "actual_particles" / f"{particle}.pcf"
+        textures = {
+            p.relative_to(materials).with_suffix("").as_posix().lower(): p
+            for p in materials.rglob("*.vtf")
+        }
+        vmts = {
+            p.relative_to(materials).with_suffix("").as_posix().lower()
+            for p in materials.rglob("*.vmt")
+        }
+        pcf = PCFFile(pcf_file).decode()
+        used = set()
+        for element in pcf.get_elements_by_type("DmeParticleSystemDefinition"):
+            value = pcf.get_attribute_value(element, "material")
+            if isinstance(value, bytes):
+                used.add(value.decode("ascii").replace("\\", "/").lower().removesuffix(".vmt"))
+        for material in sorted((used & textures.keys()) - vmts):
+            dest = config.temp_to_be_vpk_dir / "materials" / f"{material}.vtf"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(textures[material].read_bytes())
+            print(f"{dest.relative_to(config.temp_to_be_vpk_dir)}: kept, the mod has no VMT for it")
+
+
 def main(src: str, config_json: str, out: str) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     settings = json.loads(Path(config_json).read_text())
@@ -82,12 +127,12 @@ def main(src: str, config_json: str, out: str) -> None:
     errors = []
 
     # 1. Extract each mod where casual-pre-loader's importer would, then split it.
-    for name, vpk in settings["mods"].items():
+    for name, source in settings["mods"].items():
         mod_dir = config.particles_dir / name
-        for info in VPK(vpk):
-            dest = mod_dir / info.filename
+        for path, data in read_mod(Path(source)):
+            dest = mod_dir / path
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(info.read())
+            dest.write_bytes(data)
         if not any((mod_dir / "particles").glob("*.pcf")):
             errors.append(f"particle mod {name} has no particles/*.pcf")
             continue
@@ -107,6 +152,7 @@ def main(src: str, config_json: str, out: str) -> None:
     if errors:
         sys.exit("\n".join(errors))
     apply_particle_selections(selections)
+    copy_textures_without_vmt(config, selections)
 
     # 3. The particle part of Installer.install.
     referenced = config.temp_to_be_referenced_dir
