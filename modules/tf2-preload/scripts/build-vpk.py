@@ -1,7 +1,8 @@
 """Repack a mod VPK the way casual-pre-loader prepares mods before preloading.
 
-Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk>
+Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk> [<relocate json>]
 
+* Moves folders inside the VPK: relocate json is { <old path>: <new path> }.
 * Blanks `$ignorez 1` (renders through walls) with spaces of the same length,
   like casual-pre-loader's `get_from_custom_dir`.
 * Adds a VMT for every weapon/pattern VTF that has none, copied from the game's
@@ -9,6 +10,7 @@ Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk>
 * Writes a single-file V2 VPK, so split `_dir`/`_000` VPKs become one file.
 """
 
+import json
 import re
 import sys
 from pathlib import Path, PurePosixPath
@@ -28,10 +30,18 @@ def generic_vmt(texture: str) -> bytes:
     return f'"LightmappedGeneric"\n{{\n\t"$basetexture" "{texture}"\n}}\n'.encode()
 
 
-def main(src: str, vanilla_dir: str, out: str) -> None:
+def main(src: str, vanilla_dir: str, out: str, relocate: str = "{}") -> None:
     files: dict[str, bytes] = {}
     for info in VPK(src):
         files[info.filename] = info.read()
+
+    for old, new in json.loads(relocate).items():
+        moved = [p for p in files if p.lower().startswith(old.lower() + "/")]
+        if not moved:
+            sys.exit(f"relocate: nothing in {src} under {old}")
+        for path in moved:
+            files[new + path[len(old):]] = files.pop(path)
+            print(f"{path}: moved to {new}")
 
     blanked = 0
     for path, data in files.items():

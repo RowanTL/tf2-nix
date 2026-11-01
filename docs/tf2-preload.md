@@ -67,7 +67,7 @@ All options live under `programs.tf2-preload`.
 | --- | --- | --- | --- |
 | `enable` | bool | `false` | Install and preload the VPKs. |
 | `vpkDir` | `null` or path | `null` | Folder of VPKs. Each `<name>.vpk`, or split `<name>_dir.vpk` with its `_000` chunks, is installed as `custom/<name>.vpk`. |
-| `vpks` | attrs of submodules | `{ }` | VPKs installed as `custom/<name>.vpk`. Each needs `source`, or `url` and `hash`. |
+| `vpks` | attrs of submodules | `{ }` | VPKs installed as `custom/<name>.vpk`. Each needs `source`, or `url` and `hash`. `relocate` optionally moves folders inside the VPK, as `{ <old path> = <new path>; }`, for mods made before the game moved a weapon's files. |
 | `autoexec` | bool | `true` | Run the preload from mastercomfig's autoexec. Set to `false` to run `exec tf2-preload` yourself, e.g. as the launch option `+exec tf2-preload`. |
 | `map` | string | `"itemtest"` | Offline map loaded to cache the assets. |
 | `particleMods` | attrs of submodules | `{ }` | Particle mods, for `particles`. Each needs `source` (a VPK or an unpacked mod folder), or `url` and `hash` of a VPK. |

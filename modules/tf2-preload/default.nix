@@ -57,7 +57,8 @@ let
   buildVpk = name: src: pkgs.runCommand "${lib.strings.sanitizeDerivationName name}.vpk"
     { nativeBuildInputs = [ cfg.python ]; } ''
     python3 ${./scripts}/build-vpk.py ${lib.escapeShellArg "${src}"} \
-      ${vanillaMaterials}/Content/tf/tf2_misc_dir "$out"
+      ${vanillaMaterials}/Content/tf/tf2_misc_dir "$out" \
+      ${lib.escapeShellArg (builtins.toJSON (cfg.vpks.${name}.relocate or { }))}
   '';
 
   # The selected particle files, padded to their vanilla sizes, and the
@@ -81,7 +82,7 @@ let
 
   gameinfo = "$HOME/${tfDir}/gameinfo.txt";
 
-  vpkType = lib.types.submodule {
+  vpkOptions = {
     options = {
       source = lib.mkOption {
         type = lib.types.nullOr lib.types.path;
@@ -101,6 +102,26 @@ let
       };
     };
   };
+
+  vpkType = lib.types.submodule vpkOptions;
+
+  relocatableVpkType = lib.types.submodule [
+    vpkOptions
+    {
+      options.relocate = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        example = {
+          "models/weapons/c_models/c_battleaxe" = "models/workshop/weapons/c_models/c_battleaxe";
+        };
+        description = ''
+          Folders inside the VPK to move, from old path to new path. For mods
+          made before the game moved a weapon's files, which would otherwise have
+          no effect. The build fails if an old path isn't in the VPK.
+        '';
+      };
+    }
+  ];
 in
 {
   options.programs.tf2-preload = {
@@ -117,7 +138,7 @@ in
     };
 
     vpks = lib.mkOption {
-      type = lib.types.attrsOf vpkType;
+      type = lib.types.attrsOf relocatableVpkType;
       default = { };
       example = lib.literalExpression ''
         {
