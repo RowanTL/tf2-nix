@@ -58,7 +58,8 @@ let
     { nativeBuildInputs = [ cfg.python ]; } ''
     python3 ${./scripts}/build-vpk.py ${lib.escapeShellArg "${src}"} \
       ${vanillaMaterials}/Content/tf/tf2_misc_dir "$out" \
-      ${lib.escapeShellArg (builtins.toJSON (cfg.vpks.${name}.relocate or { }))}
+      ${lib.escapeShellArg (builtins.toJSON (cfg.vpks.${name}.relocate or { }))} \
+      ${lib.escapeShellArg (builtins.toJSON (cfg.vpks.${name}.rename or { }))}
   '';
 
   # The selected particle files, padded to their vanilla sizes, and the
@@ -88,7 +89,11 @@ let
         type = lib.types.nullOr lib.types.path;
         default = null;
         example = lib.literalExpression "./shovel.vpk";
-        description = "Local VPK. For a split VPK, the `_dir.vpk` with its chunks next to it.";
+        description = ''
+          Local VPK, or an unpacked mod folder (the one holding `models/` and
+          `materials/`), which is packed into a VPK. For a split VPK, the
+          `_dir.vpk` with its chunks next to it.
+        '';
       };
       url = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
@@ -118,6 +123,20 @@ let
           Folders inside the VPK to move, from old path to new path. For mods
           made before the game moved a weapon's files, which would otherwise have
           no effect. The build fails if an old path isn't in the VPK.
+        '';
+      };
+      options.rename = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = { };
+        example = {
+          "models/workshop/weapons/c_models/c_pep_scattergun/c_pep_scattergun" = "models/weapons/c_models/c_scattergun";
+        };
+        description = ''
+          Files to rename, from old path prefix to new path prefix. Every file
+          whose path starts with the old prefix is renamed, so one entry covers
+          a model's `.mdl`, `.vvd`, `.vtx` and `.phy` files. For putting a mod
+          made for one weapon onto another. Runs after `relocate`. The build
+          fails if nothing starts with an old prefix.
         '';
       };
     }

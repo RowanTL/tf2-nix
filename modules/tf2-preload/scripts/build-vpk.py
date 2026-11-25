@@ -1,8 +1,12 @@
 """Repack a mod VPK the way casual-pre-loader prepares mods before preloading.
 
-Usage: build-vpk.py <input.vpk> <vanilla tf2_misc_dir> <output.vpk> [<relocate json>]
+Usage: build-vpk.py <input.vpk or folder> <vanilla tf2_misc_dir> <output.vpk>
+                    [<relocate json> [<rename json>]]
 
+* Takes a VPK, or an unpacked mod folder (the one holding `models/`, `materials/`).
 * Moves folders inside the VPK: relocate json is { <old path>: <new path> }.
+* Renames files by path prefix: rename json is { <old prefix>: <new prefix> }, e.g.
+  to put a mod made for one weapon onto another weapon's model.
 * Blanks `$ignorez 1` (renders through walls) with spaces of the same length,
   like casual-pre-loader's `get_from_custom_dir`.
 * Adds a VMT for every weapon/pattern VTF that has none, copied from the game's
@@ -30,10 +34,15 @@ def generic_vmt(texture: str) -> bytes:
     return f'"LightmappedGeneric"\n{{\n\t"$basetexture" "{texture}"\n}}\n'.encode()
 
 
-def main(src: str, vanilla_dir: str, out: str, relocate: str = "{}") -> None:
+def main(src: str, vanilla_dir: str, out: str, relocate: str = "{}", rename: str = "{}") -> None:
     files: dict[str, bytes] = {}
-    for info in VPK(src):
-        files[info.filename] = info.read()
+    if Path(src).is_dir():
+        for path in sorted(Path(src).rglob("*")):
+            if path.is_file():
+                files[path.relative_to(src).as_posix()] = path.read_bytes()
+    else:
+        for info in VPK(src):
+            files[info.filename] = info.read()
 
     for old, new in json.loads(relocate).items():
         moved = [p for p in files if p.lower().startswith(old.lower() + "/")]
@@ -42,6 +51,14 @@ def main(src: str, vanilla_dir: str, out: str, relocate: str = "{}") -> None:
         for path in moved:
             files[new + path[len(old):]] = files.pop(path)
             print(f"{path}: moved to {new}")
+
+    for old, new in json.loads(rename).items():
+        renamed = [p for p in files if p.lower().startswith(old.lower())]
+        if not renamed:
+            sys.exit(f"rename: nothing in {src} starts with {old}")
+        for path in renamed:
+            files[new + path[len(old):]] = files.pop(path)
+            print(f"{path}: renamed to {new + path[len(old):]}")
 
     blanked = 0
     for path, data in files.items():

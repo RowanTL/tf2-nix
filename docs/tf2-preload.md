@@ -32,6 +32,26 @@ If the URL doesn't end in `.zip`, add `extension = "zip";`. For a RAR, use `exte
 `nativeBuildInputs = [ pkgs.unar ];`; if the RAR has several files at its top level, unar unpacks them
 into a folder named after the download, usually `download/`.
 
+## Mods that aren't a VPK, or are for another weapon
+
+Some downloads are an unpacked folder of `models/` and `materials/` rather than a VPK. Point `source`
+at that folder and it's packed for you. `rename` then moves a mod onto a different weapon: every file
+whose path starts with the old prefix is renamed, so one entry covers a model's `.mdl`, `.vvd`, `.vtx`
+and `.phy`, or a backpack icon's `.vtf` and `_large.vtf`:
+
+```nix
+programs.tf2-preload.vpks.witch-hunter-scattergun = {
+  # Made for the Baby Face's Blaster; put it on the stock scattergun.
+  source = "${pkgs.fetchzip { url = "..."; hash = "..."; stripRoot = false; }}/pg3d_witch_hunter";
+  rename = {
+    "models/workshop/weapons/c_models/c_pep_scattergun/c_pep_scattergun" = "models/weapons/c_models/c_scattergun";
+    "materials/backpack/workshop/weapons/c_models/c_pep_scattergun/c_pep_scattergun" = "materials/backpack/weapons/c_models/c_scattergun";
+  };
+};
+```
+
+To find a weapon's paths, list the game's `tf2_misc_dir.vpk`. The build fails if a prefix matches nothing.
+
 ## Particles
 
 Particle mods (`.pcf`) only get past `sv_pure` from the game's own `tf2_misc_dir.vpk`, so they're patched
@@ -67,7 +87,7 @@ All options live under `programs.tf2-preload`.
 | --- | --- | --- | --- |
 | `enable` | bool | `false` | Install and preload the VPKs. |
 | `vpkDir` | `null` or path | `null` | Folder of VPKs. Each `<name>.vpk`, or split `<name>_dir.vpk` with its `_000` chunks, is installed as `custom/<name>.vpk`. |
-| `vpks` | attrs of submodules | `{ }` | VPKs installed as `custom/<name>.vpk`. Each needs `source`, or `url` and `hash`. `relocate` optionally moves folders inside the VPK, as `{ <old path> = <new path>; }`, for mods made before the game moved a weapon's files. |
+| `vpks` | attrs of submodules | `{ }` | VPKs installed as `custom/<name>.vpk`. Each needs `source` (a VPK, or an unpacked mod folder that gets packed), or `url` and `hash`. `relocate` optionally moves folders inside the VPK, as `{ <old path> = <new path>; }`, for mods made before the game moved a weapon's files. `rename` optionally renames files by path prefix, as `{ <old prefix> = <new prefix>; }`, to put a mod made for one weapon onto another. |
 | `autoexec` | bool | `true` | Run the preload from mastercomfig's autoexec. Set to `false` to run `exec tf2-preload` yourself, e.g. as the launch option `+exec tf2-preload`. |
 | `map` | string | `"itemtest"` | Offline map loaded to cache the assets. |
 | `particleMods` | attrs of submodules | `{ }` | Particle mods, for `particles`. Each needs `source` (a VPK or an unpacked mod folder), or `url` and `hash` of a VPK. |
